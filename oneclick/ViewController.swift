@@ -13,7 +13,7 @@ import AVFoundation
 
 class ViewController: UIViewController {
 
-    var button : UIButton = UIButton.buttonWithType(UIButtonType.Custom) as! UIButton
+    var button : UIButton = UIButton(type: UIButtonType.Custom)
     
     var background : UIImage?
     var backgroundView : UIImageView?
@@ -25,7 +25,7 @@ class ViewController: UIViewController {
     var previewView : UIView?
     
     var captureDevice : AVCaptureDevice?
-    var scoreLabel : UILabel = UILabel.new()
+    var scoreLabel : UILabel = UILabel()
     var timer = NSTimer()
     
     
@@ -58,7 +58,7 @@ class ViewController: UIViewController {
         button.titleLabel?.layer.masksToBounds = false
         button.titleLabel?.layer.shadowOpacity = 1.0
        
-        button.autoresizingMask = UIViewAutoresizing.FlexibleLeftMargin | UIViewAutoresizing.FlexibleRightMargin | UIViewAutoresizing.FlexibleTopMargin | UIViewAutoresizing.FlexibleBottomMargin | UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight
+        button.autoresizingMask = [.FlexibleLeftMargin, .FlexibleRightMargin, .FlexibleTopMargin, .FlexibleBottomMargin, .FlexibleWidth, .FlexibleHeight]
         
         let singleTap = UITapGestureRecognizer(target: self, action: Selector("singleTap:"))
         let doubleTap = UITapGestureRecognizer(target: self, action: Selector("doubleTap:"))
@@ -72,7 +72,7 @@ class ViewController: UIViewController {
         scoreLabel.textAlignment = NSTextAlignment.Center
         scoreLabel.textColor = UIColor.whiteColor()
         scoreLabel.font = UIFont(name: scoreLabel.font.fontName, size: 14)
-        scoreLabel.autoresizingMask = UIViewAutoresizing.FlexibleLeftMargin | UIViewAutoresizing.FlexibleRightMargin | UIViewAutoresizing.FlexibleTopMargin | UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight
+        scoreLabel.autoresizingMask = [.FlexibleLeftMargin, .FlexibleRightMargin, .FlexibleTopMargin, .FlexibleWidth, .FlexibleHeight]
         
         let size = self.view.frame.size
         UIGraphicsBeginImageContextWithOptions(size, true, 0);
@@ -91,13 +91,18 @@ class ViewController: UIViewController {
         
         getDataStoreValues()
         
-        println("Latest Time = " + latestTime.description)
-        println("Score = " + score.description)
-        println("Background = " + background!.description)
+        print("Latest Time = " + latestTime.description)
+        print("Score = " + score.description)
+        print("Background = " + background!.description)
+        
+        
+        backgroundView = UIImageView(frame: self.view.frame)
+        backgroundView?.contentMode = UIViewContentMode.ScaleAspectFit
+        backgroundView?.image = background
+        self.view.addSubview(backgroundView!)
         
         captureSession.sessionPreset = AVCaptureSessionPresetHigh
-        
-        let devices = AVCaptureDevice.devices()
+    
         authStatus = AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo)
         
         if authStatus != AVAuthorizationStatus.Authorized && !NSUserDefaults.standardUserDefaults().boolForKey("hasLaunched") {
@@ -112,10 +117,31 @@ class ViewController: UIViewController {
                             delegate: self,
                             cancelButtonTitle: "OK").show()
                     })
+                } else {
+                    self.setupCamera()
                 }
             })
+        } else {
+            self.setupCamera()
         }
         
+        print("current time = " + NSDate().description)
+        print("latestTime = "+latestTime.description)
+        
+        print(managedObjectContext)
+        
+        updateButton()
+        updateScore()
+        
+        if !NSUserDefaults.standardUserDefaults().boolForKey("hasLaunched") {
+            NSUserDefaults.standardUserDefaults().setBool(true, forKey: "hasLaunched")
+            NSUserDefaults.standardUserDefaults().synchronize()
+        }
+    }
+    
+    func setupCamera() {
+        let devices = AVCaptureDevice.devices()
+        authStatus = AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo)
         if(authStatus == AVAuthorizationStatus.Authorized) {
             for device in devices {
                 // Make sure this particular device supports video
@@ -124,14 +150,14 @@ class ViewController: UIViewController {
                     if(device.position == AVCaptureDevicePosition.Front) {
                         captureDevice = device as? AVCaptureDevice
                         if captureDevice != nil {
-                            println("Capture device found")
+                            print("Capture device found")
                             
-                            var err : NSError? = nil
-                            captureSession.addInput(AVCaptureDeviceInput(device: captureDevice, error: &err))
-                            
-                            if err != nil {
-                                println("error: \(err?.localizedDescription)")
+                            do {
+                                try captureSession.addInput(AVCaptureDeviceInput(device: captureDevice))
+                            } catch {
+                                print("something when wrong when trying to add input")
                             }
+    
                             captureSession.startRunning()
                             
                             stillImageOutput.outputSettings = [AVVideoCodecKey: AVVideoCodecJPEG]
@@ -144,57 +170,34 @@ class ViewController: UIViewController {
         }
         // Loop through all the capture devices on this phone
         
-        
-        
-        backgroundView = UIImageView(frame: self.view.frame)
-        backgroundView?.contentMode = UIViewContentMode.ScaleAspectFit
-        backgroundView?.image = background
-    
-        
-        println("current time = " + NSDate().description)
-        println("latestTime = "+latestTime.description)
-        
-        println(managedObjectContext)
-        
-        updateButton()
-        updateScore()
-        
-        previewView = UIView(frame: self.view.frame)
-        
-        self.view.addSubview(backgroundView!)
-        
         if authStatus == AVAuthorizationStatus.Authorized {
+            previewView = UIView(frame: self.view.frame)
             previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
             previewLayer?.frame = self.view.layer.frame
             
-            previewView?.layer.insertSublayer(previewLayer, below: backgroundView?.layer)
+            previewView?.layer.insertSublayer(previewLayer!, below: backgroundView?.layer)
             self.view.insertSubview(previewView!, belowSubview: backgroundView!)
             //self.view.layer.insertSublayer(previewLayer, below: backgroundView?.layer)
         }
         self.view.addSubview(button)
         self.view.insertSubview(scoreLabel, aboveSubview: button)
-        
-        if !NSUserDefaults.standardUserDefaults().boolForKey("hasLaunched") {
-            NSUserDefaults.standardUserDefaults().setBool(true, forKey: "hasLaunched")
-            NSUserDefaults.standardUserDefaults().synchronize()
-        }
     }
     
     
         func authenticateLocalPlayer() {
-            var localPlayer = GKLocalPlayer.localPlayer()
-            localPlayer.authenticateHandler = {(viewController : UIViewController!, error : NSError!) -> Void in
+            let localPlayer = GKLocalPlayer.localPlayer()
+            localPlayer.authenticateHandler = {(viewController : UIViewController?, error : NSError?) -> Void in
                 if viewController != nil {
-                    self.presentViewController(viewController, animated: true, completion: nil)
+                    self.presentViewController(viewController!, animated: true, completion: nil)
                 } else {
                     if localPlayer.authenticated {
                         self.gameCenterEnabled = true
                         
-                        localPlayer.loadDefaultLeaderboardIdentifierWithCompletionHandler({ (leaderboardIdentifier : String!, error : NSError!) -> Void in
+                        localPlayer.loadDefaultLeaderboardIdentifierWithCompletionHandler({ (leaderboardIdentifier : String?, error : NSError?) -> Void in
                             if error != nil {
-                                println(error.localizedDescription)
+                                print(error!.localizedDescription)
                             } else {
-                                self.leaderboardIdentifier = leaderboardIdentifier
+                                self.leaderboardIdentifier = leaderboardIdentifier!
                             }
                         })
                         
@@ -209,44 +212,44 @@ class ViewController: UIViewController {
         let gcscore = GKScore.init(leaderboardIdentifier: leaderboardIdentifier)
         gcscore.value = Int64(score) as Int64;
 
-        GKScore.reportScores([gcscore], withCompletionHandler: {(error : NSError!) -> Void in
+        GKScore.reportScores([gcscore], withCompletionHandler: {(error : NSError?) -> Void in
             if (error != nil) {
-                print(error.localizedDescription)
+                print(error!.localizedDescription)
             }
         })
     }
         
     func takePicture() {
-        println("Capturing image")
+        print("Capturing image")
         
         if let videoConnection = stillImageOutput.connectionWithMediaType(AVMediaTypeVideo){
             stillImageOutput.captureStillImageAsynchronouslyFromConnection(videoConnection, completionHandler: {
                 (sampleBuffer, error) in
-                var imageData = AVCaptureStillImageOutput.jpegStillImageNSDataRepresentation(sampleBuffer)
-                var dataProvider = CGDataProviderCreateWithCFData(imageData)
-                var cgImageRef = CGImageCreateWithJPEGDataProvider(dataProvider, nil, true, kCGRenderingIntentDefault)
-                var image = UIImage(CGImage: cgImageRef, scale: 1.0, orientation: UIImageOrientation.LeftMirrored)
+                let imageData = AVCaptureStillImageOutput.jpegStillImageNSDataRepresentation(sampleBuffer)
+                let dataProvider = CGDataProviderCreateWithCFData(imageData)
+                let cgImageRef = CGImageCreateWithJPEGDataProvider(dataProvider, nil, true, CGColorRenderingIntent.RenderingIntentDefault)
+                let image = UIImage(CGImage: cgImageRef!, scale: 1.0, orientation: UIImageOrientation.LeftMirrored)
                 
                 self.background = image
                 self.backgroundView?.image = self.background
                 
-                println("Background set")
+                print("Background set")
                 self.updateDataStore(defaults: true)
-                println("Newest latestTime = " + self.latestTime.description)
+                print("Newest latestTime = " + self.latestTime.description)
                 self.updateButton()
                 self.updateScore()
             })
         } else {
-            self.updateDataStore(tm: self.latestTime, scr: self.score, bkg: self.background)
+            self.updateDataStore(self.latestTime, scr: self.score, bkg: self.background)
         }
     }
     
     func updateDataStore(tm : NSDate? = nil, scr : NSNumber? = nil, bkg :UIImage? =  nil, defaults : Bool? = false) {
         let fetchRequest = NSFetchRequest(entityName: "Entity")
-        let fetchResults = managedObjectContext!.executeFetchRequest(fetchRequest, error: nil) as? [Entity]
+        let fetchResults = try? managedObjectContext!.executeFetchRequest(fetchRequest) as? [Entity]
         
-        if fetchResults?.count <= 0 {
-            println("Core Data does not exist")
+        if fetchResults!!.count <= 0 {
+            print("Core Data does not exist")
             let newItem = NSEntityDescription.insertNewObjectForEntityForName("Entity", inManagedObjectContext: self.managedObjectContext!) as! Entity
             
             if tm != nil {
@@ -260,56 +263,57 @@ class ViewController: UIViewController {
                 newItem.score = score
             }
             if bkg != nil {
-                newItem.background = UIImageJPEGRepresentation(bkg, 1)
+                newItem.background = UIImageJPEGRepresentation(bkg!, 1)!
             } else {
-                newItem.background = UIImageJPEGRepresentation(background, 1)
+                newItem.background = UIImageJPEGRepresentation(background!, 1)!
             }
         } else {
-            println("Core Data exists")
-            let t : Entity = (fetchResults!.first as Entity?)!
+            print("Core Data exists")
+            let t : Entity = (fetchResults!!.first as Entity?)!
             
             
             if defaults == true {
                 t.date = latestTime
                 t.score = score
-                t.background = UIImageJPEGRepresentation(background, 1)
+                t.background = UIImageJPEGRepresentation(background!, 1)!
             }
             
             if tm != nil {
-                println("Updating t.date =" + tm!.description)
+                print("Updating t.date =" + tm!.description)
                 t.date = tm!
             }
             if scr != nil {
                 t.score = scr!
             }
             if bkg != nil {
-                t.background = UIImageJPEGRepresentation(bkg!, 1)
+                t.background = UIImageJPEGRepresentation(bkg!, 1)!
             }
             
             
         }
         
-        var error : NSError? = nil
-        if !self.managedObjectContext!.save(&error) {
-            NSLog("Unresolved error \(error), \(error!.userInfo)")
-            abort()
+        do {
+            try self.managedObjectContext!.save()
+        } catch {
+            print("unable to save")
         }
         
+        
         getDataStoreValues()
-        println("Latest Time = " + latestTime.description)
-        println("Score = " + score.description)
-        println("Background = " + background!.description)
+        print("Latest Time = " + latestTime.description)
+        print("Score = " + score.description)
+        print("Background = " + background!.description)
     }
     
     func getDataStoreValues() {
         let fetchRequest = NSFetchRequest(entityName: "Entity")
-        let fetchResults = managedObjectContext!.executeFetchRequest(fetchRequest, error: nil) as? [Entity]
+        let fetchResults = try! managedObjectContext!.executeFetchRequest(fetchRequest) as? [Entity]
         
         if fetchResults?.count <= 0 {
-            println("Core Data does not exist")
+            print("Core Data does not exist")
             updateDataStore(defaults: true)
         } else {
-            println("Core Data exists")
+            print("Core Data exists")
             let t : Entity = (fetchResults!.first as Entity?)!
             latestTime = t.date
             score = Int(t.score)
@@ -318,9 +322,8 @@ class ViewController: UIViewController {
     }
     
     func doubleTap (gesture : UIGestureRecognizer) {
-        println("double tapped")
+        print("double tapped")
         let goal : NSDate = NSDate(timeInterval: seconds as NSTimeInterval, sinceDate: latestTime) as NSDate
-        let timeTuple = secondsToHoursMinutesSeconds(Int(goal.timeIntervalSinceNow))
         
         if goal.timeIntervalSinceNow < -120.0 {
             
@@ -335,16 +338,15 @@ class ViewController: UIViewController {
     }
     
     func singleTap (gesture : UIGestureRecognizer) {
-        println(NSDate().description)
+        print(NSDate().description)
         
         let goal : NSDate = NSDate(timeInterval: seconds as NSTimeInterval, sinceDate: latestTime) as NSDate
-        let timeTuple = secondsToHoursMinutesSeconds(Int(goal.timeIntervalSinceNow))
         
         if goal.timeIntervalSinceNow < 0 && goal.timeIntervalSinceNow > -120.0 {
-            println("updating time")
-            reportScore()
+            print("updating time")
             latestTime = NSDate()
             score = score + 1
+            reportScore()
             takePicture()
         }
         
@@ -353,7 +355,7 @@ class ViewController: UIViewController {
     }
     
     func error() {
-        println("error")
+        print("error")
     }
     
     func updateScore() {
@@ -404,8 +406,8 @@ class ViewController: UIViewController {
      return true
     }
     
-    override func supportedInterfaceOrientations() -> Int {
-        return Int(UIInterfaceOrientationMask.All.rawValue)
+    override func supportedInterfaceOrientations() -> UIInterfaceOrientationMask {
+        return UIInterfaceOrientationMask.All
     }
 
     override func didReceiveMemoryWarning() {
